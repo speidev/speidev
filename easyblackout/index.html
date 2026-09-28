@@ -13,11 +13,11 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --off-white: #f2f0eb;
-      --paper: #ede9e1;
-      --ink: #111111;
-      --mid: #888880;
-      --rule: #c8c4bc;
+      --off-white: #f7f6f3;
+      --paper: #efeeea;
+      --ink: #141414;
+      --mid: #7a7a74;
+      --rule: #e3e1dc;
     }
 
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -28,27 +28,18 @@
       color: var(--ink);
       font-family: 'IBM Plex Mono', monospace;
       overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
     }
     a { color: inherit; }
-
-    /* grain */
-    body::before {
-      content: '';
-      position: fixed; inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
-      background-size: 128px 128px;
-      pointer-events: none; z-index: 1000; opacity: 0.6;
-    }
 
     /* ─── GRID ─── */
     .grid {
       display: grid;
-      grid-template-columns: 48px repeat(3, minmax(0, 1fr)) 48px;
+      grid-template-columns: minmax(40px, 1fr) repeat(3, minmax(0, 400px)) minmax(40px, 1fr);
       min-height: 100vh;
       position: relative;
     }
-    .v-rule { border-right: 1px solid var(--rule); grid-row: 1 / -1; }
-    .v-rule-right { border-left: 1px solid var(--rule); grid-row: 1 / -1; }
+    .v-rule, .v-rule-right { grid-row: 1 / -1; }
 
     /* ─── HEADER ─── */
     header {
@@ -68,7 +59,7 @@
     header.go::after { transform: scaleX(1); }
 
     .wordmark {
-      font-size: clamp(44px, 8vw, 104px);
+      font-size: clamp(44px, 7vw, 88px);
       font-weight: 700;
       letter-spacing: -0.03em;
       line-height: 0.9;
