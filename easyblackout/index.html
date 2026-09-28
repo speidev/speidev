@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EasyBlackout — SPEI.DEV</title>
+  <meta name="description" content="EasyBlackout: one hotkey blacks out every monitor and RGB peripheral on Windows, and restores them exactly." />
+  <meta property="og:title" content="EasyBlackout" />
+  <meta property="og:description" content="One hotkey. Every monitor and every RGB peripheral, dark. Press again and it all comes back." />
+  <meta property="og:url" content="https://spei.dev/easyblackout/" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --off-white: #f2f0eb;
+      --paper: #ede9e1;
+      --ink: #111111;
+      --mid: #888880;
+      --rule: #c8c4bc;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%; min-height: 100%;
+      background: var(--off-white);
+      color: var(--ink);
+      font-family: 'IBM Plex Mono', monospace;
+      overflow-x: hidden;
+    }
+    a { color: inherit; }
+
+    /* grain */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      background-size: 128px 128px;
+      pointer-events: none; z-index: 1000; opacity: 0.6;
+    }
+
+    /* ─── GRID ─── */
+    .grid {
+      display: grid;
+      grid-template-columns: 48px repeat(3, minmax(0, 1fr)) 48px;
+      min-height: 100vh;
+      position: relative;
+    }
+    .v-rule { border-right: 1px solid var(--rule); grid-row: 1 / -1; }
+    .v-rule-right { border-left: 1px solid var(--rule); grid-row: 1 / -1; }
+
+    /* ─── HEADER ─── */
+    header {
+      grid-column: 2 / 5;
+      display: grid; grid-template-columns: 1fr auto;
+      align-items: end;
+      padding: 40px 0 20px; gap: 24px;
+      position: relative;
+    }
+    header::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 1px; background: var(--ink);
+      transform-origin: left; transform: scaleX(0);
+      transition: transform 1.3s cubic-bezier(0.16, 1, 0.3, 1) 0.25s;
+    }
+    header.go::after { transform: scaleX(1); }
+
+    .wordmark {
+      font-size: clamp(44px, 8vw, 104px);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 0.9;
+    }
+    .wordmark .c-word { display: block; overflow: hidden; }
+    .wordmark .c-word span {
+      display: block;
+      transform: translateY(110%);
+      transition: transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .wordmark.go .c-word:nth-child(1) span { transform: translateY(0); transition-delay: 0.05s; }
+    .wordmark.go .c-word:nth-child(2) span { transform: translateY(0); transition-delay: 0.2s; }
+
+    .wordmark-meta {
+      font-size: 10px; font-weight: 300;
+      letter-spacing: 0.14em; color: var(--mid);
+      text-transform: uppercase; text-align: right; line-height: 2;
+      opacity: 0; transition: opacity 0.9s ease 0.7s;
+    }
+    .wordmark-meta.go { opacity: 1; }
+    .wordmark-meta span { display: block; }
+    .wordmark-meta a { text-decoration: none; }
+    .wordmark-meta a:hover { color: var(--ink); }
+
+    /* ─── STATUS BAR ─── */
+    .status-bar {
+      grid-column: 2 / 5;
+      display: flex; justify-content: space-between; align-items: center; gap: 16px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--rule);
+      font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--mid);
+      opacity: 0; transition: opacity 0.8s ease 1s;
+    }
+    .status-bar.go { opacity: 1; }
+    .status-bar a { text-decoration: none; }
+    .status-bar a:hover { color: var(--ink); }
+    .status-dot {
+      display: inline-block; width: 6px; height: 6px;
+      border-radius: 50%; background: var(--ink); margin-right: 8px;
+      animation: breatheDot 3.2s ease-in-out infinite;
+    }
+    @keyframes breatheDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.2; transform: scale(0.75); }
+    }
+
+    /* ─── MAIN ─── */
+    main {
+      grid-column: 2 / 5;
+      display: grid; grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+    }
+    .col-divider { background: var(--rule); }
+    .col-left { padding: 60px 40px 60px 0; }
+    .col-right { padding: 60px 0 60px 40px; }
+
+    .section-label {
+      font-size: 8px; font-weight: 400;
+      letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--mid); margin-bottom: 20px;
+      border-top: 1px solid var(--rule); padding-top: 10px;
+    }
+
+    .hero-statement {
+      font-size: clamp(28px, 4vw, 44px);
+      font-weight: 300; line-height: 1.15;
+      letter-spacing: -0.02em; margin-bottom: 32px;
+    }
+    .hero-statement em { font-style: italic; font-weight: 300; }
+    .hero-line { display: block; overflow: hidden; }
+    .hero-line span {
+      display: block;
+      transform: translateY(100%);
+      transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .hero-statement.go .hero-line:nth-child(1) span { transform: translateY(0); transition-delay: 0s; }
+    .hero-statement.go .hero-line:nth-child(2) span { transform: translateY(0); transition-delay: 0.09s; }
+    .hero-statement.go .hero-line:nth-child(3) span { transform: translateY(0); transition-delay: 0.18s; }
+    .hero-statement.go .hero-line:nth-child(4) span { transform: translateY(0); transition-delay: 0.27s; }
+
+    .body-copy {
+      font-size: 11px; font-weight: 300;
+      line-height: 1.9; color: var(--mid); letter-spacing: 0.04em;
+      margin-bottom: 40px; max-width: 58ch;
+    }
+    .body-copy strong { color: var(--ink); font-weight: 400; }
+
+    .sr {
+      opacity: 0; transform: translateY(14px);
+      transition: opacity 0.85s cubic-bezier(0.16,1,0.3,1),
+                  transform 0.85s cubic-bezier(0.16,1,0.3,1);
+    }
+    .sr.go { opacity: 1; transform: translateY(0); }
+
+    /* ─── KEYS ─── */
+    .keys { display: flex; align-items: center; gap: 8px; margin-bottom: 40px; flex-wrap: wrap; }
+    kbd {
+      font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
+      border: 1px solid var(--ink); border-bottom-width: 3px;
+      padding: 6px 12px; background: var(--off-white);
+    }
+    .keys .plus { font-size: 11px; color: var(--mid); }
+    .keys .hint { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--mid); margin-left: 12px; }
+    .try {
+      font-family: inherit; font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+      background: none; border: none; border-bottom: 1px solid var(--mid); color: var(--mid);
+      cursor: pointer; padding: 2px 0; margin-left: 12px;
+    }
+    .try:hover { color: var(--ink); border-color: var(--ink); }
+
+    /* ─── BUTTONS ─── */
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+    .btn {
+      display: inline-block; text-decoration: none;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+      border: 1px solid var(--ink); padding: 12px 18px;
+      transition: background 0.35s ease, color 0.35s ease, transform 0.35s ease;
+    }
+    .btn:hover { background: var(--ink); color: var(--off-white); transform: translateY(-1px); }
+    .btn.primary { background: var(--ink); color: var(--off-white); }
+    .btn.primary:hover { background: transparent; color: var(--ink); }
+    .fine { font-size: 9px; letter-spacing: 0.08em; color: var(--mid); line-height: 1.8; margin-bottom: 48px; }
+
+    /* ─── TAGS ─── */
+    .tag {
+      display: inline-block;
+      font-size: 8px; font-weight: 700;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      border: 1px solid var(--ink);
+      padding: 3px 8px; margin-right: 6px; margin-bottom: 6px;
+      cursor: default;
+      transition: background 0.35s ease, color 0.35s ease;
+    }
+    .tag:hover { background: var(--ink); color: var(--off-white); }
+    .tag-row { margin-bottom: 48px; }
+
+    /* ─── TABLE ─── */
+    .data-table {
+      width: 100%; border-collapse: collapse;
+      font-size: 10px; letter-spacing: 0.04em; line-height: 1.7; margin-bottom: 48px;
+    }
+    .data-table tr { border-top: 1px solid var(--rule); }
+    .data-table tr:last-child { border-bottom: 1px solid var(--rule); }
+    .data-table td { padding: 10px 0; vertical-align: top; }
+    .data-table td:first-child {
+      color: var(--mid); text-transform: uppercase;
+      letter-spacing: 0.16em; font-size: 8px;
+      width: 34%; padding-right: 12px; padding-top: 12px;
+    }
+    .data-table td:first-child b { display: block; color: var(--ink); font-size: 10px; letter-spacing: 0.08em; font-weight: 700; }
+    .data-table td:last-child { color: #3a3a36; font-weight: 300; }
+    .data-table code { font-family: inherit; font-size: 10px; background: var(--paper); padding: 0 4px; }
+
+    /* ─── STEPS ─── */
+    .step {
+      display: grid; grid-template-columns: 40px 1fr;
+      border-top: 1px solid var(--rule); padding: 14px 0;
+      font-size: 11px; font-weight: 300; line-height: 1.8; letter-spacing: 0.03em;
+    }
+    .step:last-child { border-bottom: 1px solid var(--rule); }
+    .step .n { font-size: 9px; letter-spacing: 0.16em; color: var(--mid); padding-top: 3px; }
+    .steps { margin-bottom: 48px; }
+
+    /* ─── FOOTER ─── */
+    footer {
+      grid-column: 2 / 5;
+      border-top: 1px solid var(--ink);
+      padding: 20px 0 40px;
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      align-items: start; gap: 24px;
+    }
+    .footer-block { font-size: 9px; letter-spacing: 0.12em; color: var(--mid); line-height: 2; }
+    .footer-block strong {
+      display: block; font-size: 8px; letter-spacing: 0.22em;
+      text-transform: uppercase; color: var(--ink); margin-bottom: 8px;
+    }
+    .footer-block a { text-decoration: none; }
+    .footer-block a:hover { color: var(--ink); }
+    .footer-center { text-align: center; }
+    .footer-right { text-align: right; }
+
+    /* ─── BLACKOUT DEMO ─── */
+    #blackout {
+      position: fixed; inset: 0; z-index: 2000;
+      background: #000; opacity: 0; pointer-events: none;
+      transition: opacity 0.12s linear;
+      display: flex; align-items: flex-end; justify-content: center;
+      padding-bottom: 40px; cursor: none;
+    }
+    #blackout.on { opacity: 1; pointer-events: auto; }
+    #blackout p {
+      font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: #1c1c1c;
+    }
+
+    @media (max-width: 768px) {
+      .grid { grid-template-columns: 16px minmax(0, 1fr) 16px; }
+      header, .status-bar, main, footer { grid-column: 2 / 3; }
+      header { grid-template-columns: 1fr; }
+      .wordmark-meta { text-align: left; }
+      .status-bar { flex-wrap: wrap; }
+      main { grid-template-columns: minmax(0, 1fr); }
+      .status-bar a { overflow-wrap: anywhere; }
+      .data-table td:first-child { width: 38%; }
+      .col-divider { display: none; }
+      .col-left { padding: 40px 0 0; }
+      .col-right { padding: 0 0 40px; }
+      footer { grid-template-columns: 1fr; }
+      .footer-center, .footer-right { text-align: left; }
+      .v-rule, .v-rule-right { display: none; }
+      .keys .hint, .try { margin-left: 0; width: 100%; text-align: left; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+      .sr { opacity: 1; transform: none; }
+      .wordmark .c-word span, .hero-line span { transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="grid">
+  <div class="v-rule"></div>
+
+  <header id="hdr">
+    <div class="wordmark" id="wm">
+      <span class="c-word"><span>EASY</span></span>
+      <span class="c-word"><span>BLACKOUT</span></span>
+    </div>
+    <div class="wordmark-meta" id="wmMeta">
+      <span>P—01</span>
+      <span>v 1.0.0</span>
+      <span>Windows 10 / 11</span>
+      <span><a href="/">← spei.dev</a></span>
+    </div>
+  </header>
+
+  <div class="status-bar" id="sb">
+    <span><span class="status-dot"></span>Released</span>
+    <span>C# · .NET 8 · WPF</span>
+    <span><a href="https://github.com/venstreni/EasyBlackout">github.com/venstreni/EasyBlackout ↗</a></span>
+  </div>
+
+  <main>
+    <div class="col-left">
+
+      <div class="sr">
+        <p class="section-label">// Statement</p>
+        <div class="hero-statement" id="hero">
+          <span class="hero-line"><span>One hotkey.</span></span>
+          <span class="hero-line"><span>Every screen,</span></span>
+          <span class="hero-line"><span>every LED,</span></span>
+          <span class="hero-line"><span><em>dark.</em></span></span>
+        </div>
+      </div>
+
+      <div class="sr">
+        <p class="body-copy">
+          EasyBlackout is a Windows tray utility. One press blacks out every monitor and every RGB peripheral on the machine: keyboard, mouse, headset, fans, RAM, GPU and LED strips.
+          <strong>Press it again and everything comes back exactly as it was</strong>, with each vendor's own lighting profile back in charge.
+        </p>
+      </div>
+
+      <div class="sr">
+        <div class="keys">
+          <kbd>Ctrl</kbd><span class="plus">+</span><kbd>Alt</kbd><span class="plus">+</span><kbd>B</kbd>
+          <button class="try" id="tryBtn" type="button">Try it on this page</button>
+        </div>
+      </div>
+
+      <div class="sr">
+        <p class="section-label">// Download</p>
+        <div class="actions">
+          <a class="btn primary" href="https://github.com/venstreni/EasyBlackout/releases/download/v1.0.0/EasyBlackout-Setup-1.0.0.exe">Installer .exe</a>
+          <a class="btn" href="https://github.com/venstreni/EasyBlackout/releases/download/v1.0.0/EasyBlackout-1.0.0-portable-win-x64.zip">Portable .zip</a>
+          <a class="btn" href="https://github.com/venstreni/EasyBlackout">Source ↗</a>
+        </div>
+        <p class="fine">
+          Windows 10 / 11, x64. The per-user installer needs no admin rights and can optionally start with Windows.<br/>
+          The builds aren't code-signed yet, so SmartScreen may warn on first run (More info → Run anyway).
+          <a href="https://github.com/venstreni/EasyBlackout/releases/tag/v1.0.0">Release notes and checksums</a>.
+        </p>
+      </div>
+
+      <div class="sr">
+        <div class="tag-row">
+          <span class="tag">C#</span>
+          <span class="tag">.NET 8</span>
+          <span class="tag">WPF</span>
+          <span class="tag">Win32</span>
+          <span class="tag">HID</span>
+          <span class="tag">DDC/CI</span>
+          <span class="tag">MIT</span>
+        </div>
+      </div>
+
+      <div class="sr">
+        <p class="section-label">// How it stays honest</p>
+        <div class="steps">
+          <div class="step"><span class="n">01</span><span>Vendor SDKs are only engaged during a blackout. The rest of the time iCUE, Synapse, G HUB and GG run your lighting as usual.</span></div>
+          <div class="step"><span class="n">02</span><span>On restore, control is released rather than repainted, so each vendor's own profile comes back, animations included.</span></div>
+          <div class="step"><span class="n">03</span><span>Devices that no API can reach are listed as <em>Not controllable</em>. EasyBlackout never claims a device is dark when it isn't.</span></div>
+          <div class="step"><span class="n">04</span><span>If the app exits or crashes mid-blackout, an emergency restore runs, and every vendor app reclaims its lighting once the process is gone.</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="col-divider"></div>
+
+    <div class="col-right">
+
+      <div class="sr">
+        <p class="section-label">// Integrations</p>
+        <table class="data-table">
+          <tr><td><b>Displays</b>Every monitor</td><td>A topmost black overlay per monitor, in physical pixels with per-monitor DPI. Optional per-monitor DDC/CI hardware power-off gives true zero light.</td></tr>
+          <tr><td><b>Corsair iCUE</b>SDK v4</td><td>Exclusive lighting control, held only while blacked out. On restore the LEDs go transparent and control is released.</td></tr>
+          <tr><td><b>Razer Chroma</b>REST SDK</td><td>A Chroma session exists only during the blackout. Deleting it hands control back to Synapse.</td></tr>
+          <tr><td><b>Logitech G HUB</b>LED SDK</td><td>The SDK is initialised only during the blackout. <code>LogiLedShutdown</code> returns control to G HUB.</td></tr>
+          <tr><td><b>SteelSeries GG</b>GameSense</td><td>Black game events while blacked out. <code>stop_game</code> returns control to GG.</td></tr>
+          <tr><td><b>HyperX</b>Native HID</td><td>NGENUITY has no SDK, so black direct-mode frames are streamed instead. The firmware reverts to its onboard lighting within about 50 ms of the stream stopping.</td></tr>
+          <tr><td><b>Dynamic Lighting</b>Windows LampArray</td><td>HID LampArray devices with no vendor app, opened only while the overlay is in the foreground.</td></tr>
+          <tr><td><b>OpenRGB</b>SDK server</td><td>Motherboard, RAM, GPU and strips. Each controller's mode and colors are saved first, then written back on restore.</td></tr>
+        </table>
+      </div>
+
+      <div class="sr">
+        <p class="section-label">// Build from source</p>
+        <table class="data-table">
+          <tr><td>Requires</td><td>.NET 8 SDK, plus Inno Setup 6 for the installer</td></tr>
+          <tr><td>Build</td><td><code>.\build.ps1</code> runs the tests, publishes, and builds the installer</td></tr>
+          <tr><td>Tests</td><td>xUnit: orchestrator with fake providers, hotkeys, settings, status</td></tr>
+          <tr><td>License</td><td>MIT. The Corsair iCUE SDK DLL is redistributed under Corsair's SDK license.</td></tr>
+        </table>
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="sr">
+    <div class="footer-block">
+      <strong>Spei.dev</strong>
+      <a href="/">← Back to index</a><br/>
+      © 2025–<span id="yr">2026</span>
+    </div>
+    <div class="footer-block footer-center">
+      <strong>Project</strong>
+      EasyBlackout v1.0.0<br/>MIT licensed
+    </div>
+    <div class="footer-block footer-right">
+      <strong>Source</strong>
+      <a href="https://github.com/venstreni/EasyBlackout">GitHub ↗</a><br/>
+      <a href="https://github.com/venstreni/EasyBlackout/issues">Report an issue ↗</a>
+    </div>
+  </footer>
+
+  <div class="v-rule-right"></div>
+</div>
+
+<div id="blackout" aria-hidden="true"><p>Ctrl + Alt + B, Esc or click to restore</p></div>
+
+<script>
+  const $ = id => document.getElementById(id);
+
+  window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => { $('wm').classList.add('go'); $('hdr').classList.add('go'); }, 100);
+    setTimeout(() => $('wmMeta').classList.add('go'), 500);
+    setTimeout(() => $('sb').classList.add('go'), 850);
+    setTimeout(() => $('hero').classList.add('go'), 700);
+  });
+
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      e.target.classList.add('go');
+      const h = e.target.querySelector('.hero-statement');
+      if (h) h.classList.add('go');
+      io.unobserve(e.target);
+    });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.sr').forEach(el => io.observe(el));
+
+  $('yr').textContent = new Date().getFullYear();
+
+  // ── BLACKOUT DEMO: the real hotkey, scoped to this tab ──
+  const bo = $('blackout');
+  const setBlackout = on => {
+    bo.classList.toggle('on', on);
+    bo.setAttribute('aria-hidden', String(!on));
+  };
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.altKey && e.code === 'KeyB') {
+      e.preventDefault();
+      setBlackout(!bo.classList.contains('on'));
+    } else if (e.key === 'Escape') {
+      setBlackout(false);
+    }
+  });
+  $('tryBtn').addEventListener('click', () => setBlackout(true));
+  bo.addEventListener('click', () => setBlackout(false));
+</script>
+</body>
+</html>

@@ -256,6 +256,28 @@
     .cur-v { top: 0; bottom: 0; width: 1px; }
     body.cursor-active .cur { opacity: 1; }
 
+    /* ─── PROJECTS ─── */
+    .projects {
+      grid-column: 2 / 5;
+      border-top: 1px solid var(--rule);
+      padding: 60px 0;
+    }
+    .project-row {
+      display: grid; grid-template-columns: 64px 1fr auto;
+      align-items: baseline; gap: 24px;
+      border-top: 1px solid var(--rule); padding: 22px 0;
+      color: var(--ink); text-decoration: none;
+      transition: padding-left 0.4s cubic-bezier(0.16,1,0.3,1);
+    }
+    .project-row:last-child { border-bottom: 1px solid var(--rule); }
+    .project-row:hover { padding-left: 8px; }
+    .project-index { font-size: 9px; letter-spacing: 0.16em; color: var(--mid); }
+    .project-name { font-size: clamp(22px, 3vw, 32px); font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+    .project-desc { display: block; margin-top: 10px; font-size: 11px; font-weight: 300; line-height: 1.8; letter-spacing: 0.04em; color: var(--mid); max-width: 60ch; }
+    .project-meta { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--mid); text-align: right; white-space: nowrap; }
+    .project-meta .arrow { display: inline-block; margin-left: 8px; color: var(--ink); transition: transform 0.4s cubic-bezier(0.16,1,0.3,1); }
+    .project-row:hover .arrow { transform: translateX(4px); }
+
     /* ─── FOOTER ─── */
     footer {
       grid-column: 2 / 5;
@@ -274,7 +296,11 @@
 
     @media (max-width: 768px) {
       .grid { grid-template-columns: 20px 1fr 20px; }
-      header, .status-bar, main, footer { grid-column: 2 / 3; }
+      header, .status-bar, main, .projects, footer { grid-column: 2 / 3; }
+      .projects { padding: 40px 0; }
+      .project-row { grid-template-columns: 1fr; gap: 10px; }
+      .project-index { display: none; }
+      .project-meta { text-align: left; }
       header { grid-template-columns: 1fr; }
       main { grid-template-columns: 1fr; }
       .col-divider { display: none; }
@@ -394,6 +420,20 @@
 
     </div>
   </main>
+
+  <section class="projects">
+    <div class="sr">
+      <p class="section-label">// Projects</p>
+      <a class="project-row" href="/easyblackout/">
+        <span class="project-index">P—01</span>
+        <span>
+          <span class="project-name">EasyBlackout</span>
+          <span class="project-desc">One hotkey blacks out every monitor and every RGB peripheral on a Windows PC. Press it again and it all comes back exactly as it was.</span>
+        </span>
+        <span class="project-meta">Windows · C# · v1.0.0<span class="arrow">→</span></span>
+      </a>
+    </div>
+  </section>
 
   <footer class="sr">
     <div class="footer-block">
