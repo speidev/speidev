@@ -150,41 +150,26 @@
     }
     .sr.go { opacity: 1; transform: translateY(0); }
 
-    /* ─── ORBIT DEMO ─── */
+    /* ─── VIEWER BOX ─── */
     .demo {
       position: relative;
       border: 1px solid var(--rule);
       background: var(--paper);
       margin-bottom: 40px;
       aspect-ratio: 4 / 3;
-      cursor: grab;
-      touch-action: none;
-      user-select: none;
-    }
-    .demo:active { cursor: grabbing; }
-    .demo canvas { display: block; width: 100%; height: 100%; }
-    .demo .hint {
-      position: absolute; left: 12px; bottom: 10px;
-      font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--mid);
-      pointer-events: none;
-    }
-    .demo .readout {
-      position: absolute; right: 12px; top: 10px;
-      font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mid);
-      pointer-events: none; text-align: right; line-height: 1.8;
+      display: flex; align-items: center; justify-content: center;
     }
     .demo .launch {
-      position: absolute; left: 12px; top: 10px;
-      font-family: inherit; font-size: 9px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+      font-family: inherit; font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
       background: var(--ink); color: var(--off-white); border: 1px solid var(--ink);
-      padding: 9px 12px; cursor: pointer;
-      transition: background 0.35s ease, color 0.35s ease;
+      padding: 12px 18px; cursor: pointer;
+      transition: background 0.35s ease, color 0.35s ease, transform 0.35s ease;
     }
-    .demo .launch:hover { background: transparent; color: var(--ink); }
-    .demo .launch span { font-weight: 300; letter-spacing: 0.08em; margin-left: 6px; opacity: 0.7; }
+    .demo .launch:hover { background: transparent; color: var(--ink); transform: translateY(-1px); }
+    .demo .launch span { font-weight: 300; letter-spacing: 0.08em; margin-left: 8px; opacity: 0.7; }
     .demo iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
-    .demo.live { cursor: default; background: #1f2126; border-color: #1f2126; }
-    .demo.live canvas, .demo.live .readout, .demo.live .hint, .demo.live .launch { display: none; }
+    .demo.live { background: #1f2126; border-color: #1f2126; }
+    .demo.live .launch { display: none; }
     .demo-note { margin-top: -28px; margin-bottom: 40px; }
 
     kbd {
@@ -332,14 +317,11 @@
       </div>
 
       <div class="sr">
-        <div class="demo" id="demo" aria-label="Interactive wireframe: drag to orbit, scroll to zoom, double-click to reset" role="img">
-          <canvas id="cv"></canvas>
-          <span class="readout" id="readout">yaw −120°<br/>pitch −20°</span>
-          <span class="hint">Drag to orbit · scroll to zoom · double-click to reset</span>
-          <button class="launch" id="launch" type="button">Run the real viewer<span>~2.4 MB</span></button>
+        <div class="demo" id="demo">
+          <button class="launch" id="launch" type="button">Run the viewer<span>~2.4 MB</span></button>
         </div>
         <p class="fine demo-note">
-          The wireframe is a sketch. The button loads Glance3D itself: the same C# loader, camera and shaders as the desktop app, compiled to WebAssembly and drawn with WebGL2. Drop your own <code>.glb</code> on it, or <a href="https://speidev.github.io/Glance3D/">open it full screen ↗</a>. Files never leave your browser.
+          The button loads Glance3D itself: the same C# loader, camera and shaders as the desktop app, compiled to WebAssembly and drawn with WebGL2. Drop your own <code>.glb</code> on it, or <a href="https://speidev.github.io/Glance3D/">open it full screen ↗</a>. Files never leave your browser.
         </p>
       </div>
 
@@ -468,120 +450,18 @@
 
   $('yr').textContent = new Date().getFullYear();
 
-  // ── ORBIT DEMO: the viewer's camera rig, in a canvas ──
-  // Same conventions as Glance3D: world Z-up, a yaw/pitch heading around a pivot, eye placed at
-  // pivot - forward * distance, pitch clamped short of vertical, default heading -120 / -20.
-  const cv = $('cv'), demo = $('demo'), ctx = cv.getContext('2d');
-  const DEG = Math.PI / 180, MAX_PITCH = 89 * DEG;
-  const DEFAULT = { yaw: -120 * DEG, pitch: -20 * DEG, dist: 6.2 };
-  let cam = { ...DEFAULT };
-  let interacted = false;
-  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  // A little log cabin: box walls, hip roof, door. A nod to where the renderer came from.
-  const V = [
-    [-1.4,-1,0],[1.4,-1,0],[1.4,1,0],[-1.4,1,0],          // 0-3 floor
-    [-1.4,-1,1.2],[1.4,-1,1.2],[1.4,1,1.2],[-1.4,1,1.2],  // 4-7 wall tops
-    [-1.7,-1.3,1.2],[1.7,-1.3,1.2],[1.7,1.3,1.2],[-1.7,1.3,1.2], // 8-11 eaves
-    [-0.6,0,2.2],[0.6,0,2.2],                              // 12-13 ridge
-    [-0.3,1,0],[0.3,1,0],[0.3,1,0.8],[-0.3,1,0.8],         // 14-17 door (front, +Y)
-  ];
-  const E = [
-    [0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7],
-    [8,9],[9,10],[10,11],[11,8],[12,13],[8,12],[11,12],[9,13],[10,13],
-    [14,17],[17,16],[16,15],
-  ];
-  // Floor grid, like the viewer's: lines on the model's lowest plane.
-  const G = [];
-  for (let i = -4; i <= 4; i++) { G.push([[i*0.5,-2,0],[i*0.5,2,0]]); G.push([[-2,i*0.5,0],[2,i*0.5,0]]); }
-
-  function basis() {
-    const cp = Math.cos(cam.pitch);
-    const f = [cp*Math.cos(cam.yaw), cp*Math.sin(cam.yaw), Math.sin(cam.pitch)];
-    let r = [-f[1], f[0], 0];                       // cross(worldUp, f)
-    const rl = Math.hypot(r[0], r[1]); r = [r[0]/rl, r[1]/rl, 0];
-    const u = [f[1]*r[2]-f[2]*r[1], f[2]*r[0]-f[0]*r[2], f[0]*r[1]-f[1]*r[0]];
-    const pivot = [0, 0, 0.9];
-    const eye = [pivot[0]-f[0]*cam.dist, pivot[1]-f[1]*cam.dist, pivot[2]-f[2]*cam.dist];
-    return { f, r, u, eye };
-  }
-
-  function draw() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = cv.clientWidth, h = cv.clientHeight;
-    if (cv.width !== Math.round(w*dpr) || cv.height !== Math.round(h*dpr)) { cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-
-    const { f, r, u, eye } = basis();
-    const halfTan = Math.tan(25 * DEG), scale = (h / 2) / halfTan;
-    // Camera space X=forward, Y=right, Z=up; divide by depth (x), exactly like the viewer's shader.
-    const proj = p => {
-      const d = [p[0]-eye[0], p[1]-eye[1], p[2]-eye[2]];
-      const x = d[0]*f[0]+d[1]*f[1]+d[2]*f[2];
-      const y = d[0]*r[0]+d[1]*r[1]+d[2]*r[2];
-      const z = d[0]*u[0]+d[1]*u[1]+d[2]*u[2];
-      return x > 0.05 ? [w/2 + y/x*scale, h/2 - z/x*scale] : null;
-    };
-    const line = (a, b) => { const p = proj(a), q = proj(b); if (!p || !q) return; ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); };
-
-    ctx.lineWidth = 1; ctx.strokeStyle = '#d6d4ce';
-    G.forEach(([a, b]) => line(a, b));
-    ctx.lineWidth = 1.25; ctx.strokeStyle = '#141414';
-    E.forEach(([a, b]) => line(V[a], V[b]));
-
-    $('readout').innerHTML = `yaw ${Math.round(cam.yaw/DEG)}°<br/>pitch ${Math.round(cam.pitch/DEG)}°`.replace(/-/g, '−');
-  }
-
-  let drag = null;
-  demo.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY }; interacted = true; demo.setPointerCapture(e.pointerId); });
-  demo.addEventListener('pointermove', e => {
-    if (!drag) return;
-    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-    drag = { x: e.clientX, y: e.clientY };
-    cam.yaw += dx * 0.01;
-    cam.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, cam.pitch - dy * 0.01));
-    draw();
-  });
-  const end = () => { drag = null; };
-  demo.addEventListener('pointerup', end);
-  demo.addEventListener('pointercancel', end);
-  demo.addEventListener('wheel', e => {
-    e.preventDefault(); interacted = true;
-    cam.dist = Math.max(3, Math.min(14, cam.dist * Math.pow(0.85, -Math.sign(e.deltaY))));
-    draw();
-  }, { passive: false });
-  demo.addEventListener('dblclick', () => { cam = { ...DEFAULT }; interacted = false; draw(); });
-
-  // ── THE REAL VIEWER: swap the sketch for Glance3D itself, only when asked ──
+  // ── THE VIEWER: load Glance3D into the box, only when asked ──
   // Nothing of the ~2.4 MB WebAssembly build loads until the click. The iframe keeps the
   // viewer's full-window layout and styles isolated from this page.
-  let live = false;
-  const launch = $('launch');
-  launch.addEventListener('pointerdown', e => e.stopPropagation()); // don't start a sketch drag (and steal the click)
-  launch.addEventListener('click', () => {
-    live = true;
+  const demo = $('demo');
+  $('launch').addEventListener('click', () => {
     const f = document.createElement('iframe');
     f.src = 'https://speidev.github.io/Glance3D/';
     f.title = 'Glance3D viewer';
     f.allow = 'fullscreen';
     demo.classList.add('live');
-    demo.removeAttribute('role');
-    demo.setAttribute('aria-label', 'Glance3D viewer');
     demo.appendChild(f);
   });
-  window.addEventListener('resize', draw);
-
-  // Idle turntable until the visitor grabs it.
-  let last = performance.now();
-  function loop(t) {
-    const dt = Math.min(0.05, (t - last) / 1000); last = t;
-    if (live) return; // the sketch is gone; stop its loop
-    if (!interacted && !drag && !reduceMotion) { cam.yaw += dt * 0.25; draw(); }
-    requestAnimationFrame(loop);
-  }
-  draw();
-  requestAnimationFrame(loop);
 </script>
 </body>
 </html>
