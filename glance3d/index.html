@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Glance3D — SPEI.DEV</title>
+  <meta name="description" content="Glance3D: a tiny standalone glTF / GLB model viewer. Open a model, orbit around it, fly through it, close it again." />
+  <meta property="og:title" content="Glance3D" />
+  <meta property="og:description" content="A tiny standalone glTF / GLB model viewer. Open a model, orbit around it, fly through it, close it again." />
+  <meta property="og:url" content="https://spei.dev/glance3d/" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --off-white: #f7f6f3;
+      --paper: #efeeea;
+      --ink: #141414;
+      --mid: #7a7a74;
+      --rule: #e3e1dc;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%; min-height: 100%;
+      background: var(--off-white);
+      color: var(--ink);
+      font-family: 'IBM Plex Mono', monospace;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; }
+
+    /* ─── GRID ─── */
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(40px, 1fr) repeat(3, minmax(0, 400px)) minmax(40px, 1fr);
+      min-height: 100vh;
+      position: relative;
+    }
+    .v-rule, .v-rule-right { grid-row: 1 / -1; }
+
+    /* ─── HEADER ─── */
+    header {
+      grid-column: 2 / 5;
+      display: grid; grid-template-columns: 1fr auto;
+      align-items: end;
+      padding: 40px 0 20px; gap: 24px;
+      position: relative;
+    }
+    header::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 1px; background: var(--ink);
+      transform-origin: left; transform: scaleX(0);
+      transition: transform 1.3s cubic-bezier(0.16, 1, 0.3, 1) 0.25s;
+    }
+    header.go::after { transform: scaleX(1); }
+
+    .wordmark {
+      font-size: clamp(44px, 7vw, 88px);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 0.9;
+    }
+    .wordmark .c-word { display: block; overflow: hidden; }
+    .wordmark .c-word span {
+      display: block;
+      transform: translateY(110%);
+      transition: transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .wordmark.go .c-word:nth-child(1) span { transform: translateY(0); transition-delay: 0.05s; }
+    .wordmark.go .c-word:nth-child(2) span { transform: translateY(0); transition-delay: 0.2s; }
+
+    .wordmark-meta {
+      font-size: 10px; font-weight: 300;
+      letter-spacing: 0.14em; color: var(--mid);
+      text-transform: uppercase; text-align: right; line-height: 2;
+      opacity: 0; transition: opacity 0.9s ease 0.7s;
+    }
+    .wordmark-meta.go { opacity: 1; }
+    .wordmark-meta span { display: block; }
+    .wordmark-meta a { text-decoration: none; }
+    .wordmark-meta a:hover { color: var(--ink); }
+
+    /* ─── STATUS BAR ─── */
+    .status-bar {
+      grid-column: 2 / 5;
+      display: flex; justify-content: space-between; align-items: center; gap: 16px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--rule);
+      font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--mid);
+      opacity: 0; transition: opacity 0.8s ease 1s;
+    }
+    .status-bar.go { opacity: 1; }
+    .status-bar a { text-decoration: none; }
+    .status-bar a:hover { color: var(--ink); }
+    .status-dot {
+      display: inline-block; width: 6px; height: 6px;
+      border-radius: 50%; background: var(--ink); margin-right: 8px;
+      animation: breatheDot 3.2s ease-in-out infinite;
+    }
+    @keyframes breatheDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.2; transform: scale(0.75); }
+    }
+
+    /* ─── MAIN ─── */
+    main {
+      grid-column: 2 / 5;
+      display: grid; grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+    }
+    .col-divider { background: var(--rule); }
+    .col-left { padding: 60px 40px 60px 0; }
+    .col-right { padding: 60px 0 60px 40px; }
+
+    .section-label {
+      font-size: 8px; font-weight: 400;
+      letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--mid); margin-bottom: 20px;
+      border-top: 1px solid var(--rule); padding-top: 10px;
+    }
+
+    .hero-statement {
+      font-size: clamp(22px, 2.6vw, 30px);
+      font-weight: 400; line-height: 1.3;
+      letter-spacing: -0.02em; margin-bottom: 32px;
+    }
+    .hero-line { display: block; overflow: hidden; }
+    .hero-line span {
+      display: block;
+      transform: translateY(100%);
+      transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .hero-statement.go .hero-line:nth-child(1) span { transform: translateY(0); transition-delay: 0s; }
+    .hero-statement.go .hero-line:nth-child(2) span { transform: translateY(0); transition-delay: 0.09s; }
+
+    .body-copy {
+      font-size: 11px; font-weight: 300;
+      line-height: 1.9; color: var(--mid); letter-spacing: 0.04em;
+      margin-bottom: 40px; max-width: 58ch;
+    }
+    .body-copy strong { color: var(--ink); font-weight: 400; }
+
+    .sr {
+      opacity: 0; transform: translateY(14px);
+      transition: opacity 0.85s cubic-bezier(0.16,1,0.3,1),
+                  transform 0.85s cubic-bezier(0.16,1,0.3,1);
+    }
+    .sr.go { opacity: 1; transform: translateY(0); }
+
+    /* ─── ORBIT DEMO ─── */
+    .demo {
+      position: relative;
+      border: 1px solid var(--rule);
+      background: var(--paper);
+      margin-bottom: 40px;
+      aspect-ratio: 4 / 3;
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+    }
+    .demo:active { cursor: grabbing; }
+    .demo canvas { display: block; width: 100%; height: 100%; }
+    .demo .hint {
+      position: absolute; left: 12px; bottom: 10px;
+      font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--mid);
+      pointer-events: none;
+    }
+    .demo .readout {
+      position: absolute; right: 12px; top: 10px;
+      font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mid);
+      pointer-events: none; text-align: right; line-height: 1.8;
+    }
+
+    kbd {
+      font-family: inherit; font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+      border: 1px solid var(--ink); border-bottom-width: 2px;
+      padding: 1px 6px; background: var(--off-white);
+      white-space: nowrap;
+    }
+
+    /* ─── BUTTONS ─── */
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+    .btn {
+      display: inline-block; text-decoration: none;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+      border: 1px solid var(--ink); padding: 12px 18px;
+      transition: background 0.35s ease, color 0.35s ease, transform 0.35s ease;
+    }
+    .btn:hover { background: var(--ink); color: var(--off-white); transform: translateY(-1px); }
+    .btn.primary { background: var(--ink); color: var(--off-white); }
+    .btn.primary:hover { background: transparent; color: var(--ink); }
+    .fine { font-size: 9px; letter-spacing: 0.08em; color: var(--mid); line-height: 1.8; margin-bottom: 48px; }
+    .fine code { font-family: inherit; background: var(--paper); padding: 0 4px; }
+
+    /* ─── TAGS ─── */
+    .tag {
+      display: inline-block;
+      font-size: 8px; font-weight: 700;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      border: 1px solid var(--ink);
+      padding: 3px 8px; margin-right: 6px; margin-bottom: 6px;
+      cursor: default;
+      transition: background 0.35s ease, color 0.35s ease;
+    }
+    .tag:hover { background: var(--ink); color: var(--off-white); }
+    .tag-row { margin-bottom: 48px; }
+
+    /* ─── TABLE ─── */
+    .data-table {
+      width: 100%; border-collapse: collapse;
+      font-size: 10px; letter-spacing: 0.04em; line-height: 1.7; margin-bottom: 48px;
+    }
+    .data-table tr { border-top: 1px solid var(--rule); }
+    .data-table tr:last-child { border-bottom: 1px solid var(--rule); }
+    .data-table td { padding: 10px 0; vertical-align: top; }
+    .data-table td:first-child {
+      color: var(--mid); text-transform: uppercase;
+      letter-spacing: 0.16em; font-size: 8px;
+      width: 34%; padding-right: 12px; padding-top: 12px;
+    }
+    .data-table td:first-child b { display: block; color: var(--ink); font-size: 10px; letter-spacing: 0.08em; font-weight: 700; }
+    .data-table td:last-child { color: #3a3a36; font-weight: 300; }
+    .data-table code { font-family: inherit; font-size: 10px; background: var(--paper); padding: 0 4px; }
+
+    /* ─── STEPS ─── */
+    .step {
+      display: grid; grid-template-columns: 40px 1fr;
+      border-top: 1px solid var(--rule); padding: 14px 0;
+      font-size: 11px; font-weight: 300; line-height: 1.8; letter-spacing: 0.03em;
+    }
+    .step:last-child { border-bottom: 1px solid var(--rule); }
+    .step .n { font-size: 9px; letter-spacing: 0.16em; color: var(--mid); padding-top: 3px; }
+    .steps { margin-bottom: 48px; }
+
+    /* ─── FOOTER ─── */
+    footer {
+      grid-column: 2 / 5;
+      border-top: 1px solid var(--ink);
+      padding: 20px 0 40px;
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      align-items: start; gap: 24px;
+    }
+    .footer-block { font-size: 9px; letter-spacing: 0.12em; color: var(--mid); line-height: 2; }
+    .footer-block strong {
+      display: block; font-size: 8px; letter-spacing: 0.22em;
+      text-transform: uppercase; color: var(--ink); margin-bottom: 8px;
+    }
+    .footer-block a { text-decoration: none; }
+    .footer-block a:hover { color: var(--ink); }
+    .footer-center { text-align: center; }
+    .footer-right { text-align: right; }
+
+    @media (max-width: 768px) {
+      .grid { grid-template-columns: 16px minmax(0, 1fr) 16px; }
+      header, .status-bar, main, footer { grid-column: 2 / 3; }
+      header { grid-template-columns: 1fr; }
+      .wordmark-meta { text-align: left; }
+      .status-bar { flex-wrap: wrap; }
+      main { grid-template-columns: minmax(0, 1fr); }
+      .status-bar a { overflow-wrap: anywhere; }
+      .data-table td:first-child { width: 38%; }
+      .col-divider { display: none; }
+      .col-left { padding: 40px 0 0; }
+      .col-right { padding: 0 0 40px; }
+      footer { grid-template-columns: 1fr; }
+      .footer-center, .footer-right { text-align: left; }
+      .v-rule, .v-rule-right { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+      .sr { opacity: 1; transform: none; }
+      .wordmark .c-word span, .hero-line span { transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="grid">
+  <div class="v-rule"></div>
+
+  <header id="hdr">
+    <div class="wordmark" id="wm">
+      <span class="c-word"><span>GLANCE</span></span>
+      <span class="c-word"><span>3D</span></span>
+    </div>
+    <div class="wordmark-meta" id="wmMeta">
+      <span>P—02</span>
+      <span>v 0.1.0</span>
+      <span>Windows / Linux / macOS</span>
+      <span><a href="/">← spei.dev</a></span>
+    </div>
+  </header>
+
+  <div class="status-bar" id="sb">
+    <span><span class="status-dot"></span>Released</span>
+    <span>C# · .NET 8 · OpenGL 3.3</span>
+    <span><a href="https://github.com/speidev/Glance3D">github.com/speidev/Glance3D ↗</a></span>
+  </div>
+
+  <main>
+    <div class="col-left">
+
+      <div class="sr">
+        <p class="section-label">// Overview</p>
+        <div class="hero-statement" id="hero">
+          <span class="hero-line"><span>Open a 3D model.</span></span>
+          <span class="hero-line"><span>Orbit around it. Close it.</span></span>
+        </div>
+      </div>
+
+      <div class="sr">
+        <p class="body-copy">
+          Glance3D is a tiny standalone viewer for glTF and GLB files. There's no editor, no scene panel and no installer: drop a model on the window and look at it.
+          <strong>It's about 1,500 lines of C# on a hand-written OpenGL renderer</strong>, small enough to read in an afternoon.
+        </p>
+      </div>
+
+      <div class="sr">
+        <div class="demo" id="demo" aria-label="Interactive wireframe: drag to orbit, scroll to zoom, double-click to reset" role="img">
+          <canvas id="cv"></canvas>
+          <span class="readout" id="readout">yaw −120°<br/>pitch −20°</span>
+          <span class="hint">Drag to orbit · scroll to zoom · double-click to reset</span>
+        </div>
+      </div>
+
+      <div class="sr">
+        <p class="section-label">// Download</p>
+        <div class="actions">
+          <a class="btn primary" href="https://github.com/speidev/Glance3D/releases/download/v0.1.0/glance3d-v0.1.0-win-x64.zip">Windows .zip</a>
+          <a class="btn" href="https://github.com/speidev/Glance3D/releases/download/v0.1.0/glance3d-v0.1.0-linux-x64.tar.gz">Linux .tar.gz</a>
+          <a class="btn" href="https://github.com/speidev/Glance3D/releases/download/v0.1.0/glance3d-v0.1.0-osx-arm64.tar.gz">macOS .tar.gz</a>
+          <a class="btn" href="https://github.com/speidev/Glance3D">Source ↗</a>
+        </div>
+        <p class="fine">
+          One self-contained executable per platform (x64; Apple Silicon on macOS). No .NET install needed. Run <code>glance3d model.glb</code> or drop a file on the window.<br/>
+          The builds aren't code-signed yet, so SmartScreen may warn on first run (More info → Run anyway). On macOS, clear the quarantine flag with <code>xattr -d com.apple.quarantine glance3d</code>.
+          <a href="https://github.com/speidev/Glance3D/releases/tag/v0.1.0">Release notes</a>.
+        </p>
+      </div>
+
+      <div class="sr">
+        <div class="tag-row">
+          <span class="tag">C#</span>
+          <span class="tag">.NET 8</span>
+          <span class="tag">OpenGL</span>
+          <span class="tag">GLSL</span>
+          <span class="tag">glTF 2.0</span>
+          <span class="tag">OpenTK</span>
+          <span class="tag">MIT</span>
+        </div>
+      </div>
+
+      <div class="sr">
+        <p class="section-label">// Controls</p>
+        <div class="steps">
+          <div class="step"><span class="n">01</span><span><b>Left drag</b> orbits the model. <b>Right drag</b> (or Shift + left) pans. The <b>wheel</b> zooms toward the pivot.</span></div>
+          <div class="step"><span class="n">02</span><span><b>Double-click</b> any surface and the camera orbits around that point from then on, which helps with close inspection.</span></div>
+          <div class="step"><span class="n">03</span><span><kbd>Tab</kbd> switches to fly mode: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to move, <kbd>Q</kbd><kbd>E</kbd> down and up, <kbd>Shift</kbd> for speed. Switching back doesn't jump the view.</span></div>
+          <div class="step"><span class="n">04</span><span><kbd>F</kbd> frames the model, <kbd>R</kbd> resets the view, <kbd>Z</kbd> toggles wireframe, <kbd>G</kbd> toggles the floor grid, <kbd>F11</kbd> goes fullscreen.</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="col-divider"></div>
+
+    <div class="col-right">
+
+      <div class="sr">
+        <p class="section-label">// Reads</p>
+        <table class="data-table">
+          <tr><td><b>Formats</b>glTF 2.0</td><td>Binary <code>.glb</code> and JSON <code>.gltf</code> with external or embedded buffers.</td></tr>
+          <tr><td><b>Scene</b>Node hierarchy</td><td>Node transforms are baked in at load, mirrored instances keep their winding, and triangle strips and fans are expanded.</td></tr>
+          <tr><td><b>Materials</b>Base color</td><td>Texture × factor × vertex color. Alpha mask and blend, double-sided, and <code>KHR_materials_unlit</code>.</td></tr>
+          <tr><td><b>Pixel art</b>NEAREST samplers</td><td>A model that asks for nearest filtering gets it, so palette-textured low-poly art stays crisp.</td></tr>
+          <tr><td><b>Characters</b>Skins</td><td>Skinned meshes are posed by their joints and shown in bind pose instead of falling apart at the origin.</td></tr>
+          <tr><td><b>Not yet</b>Roadmap</td><td>Animation playback, morph targets, PBR metal/roughness, KTX2/WebP textures.</td></tr>
+        </table>
+      </div>
+
+      <div class="sr">
+        <p class="section-label">// Thumbnails</p>
+        <table class="data-table">
+          <tr><td>Headless</td><td><code>glance3d chair.glb --capture chair.png --size 1024x1024 --view -90,-10</code> renders one frame offscreen and exits.</td></tr>
+          <tr><td>Framing</td><td>The camera fits the model's bounding sphere to the narrower field of view at any aspect ratio.</td></tr>
+        </table>
+      </div>
+
+      <div class="sr">
+        <p class="section-label">// Build from source</p>
+        <table class="data-table">
+          <tr><td>Requires</td><td>.NET 8 SDK and a GPU with OpenGL 3.3</td></tr>
+          <tr><td>Run</td><td><code>dotnet run --project src/Glance3D -- model.glb</code></td></tr>
+          <tr><td>Tests</td><td>xUnit, headless: camera math, projection and culling, loader orientation and winding, CLI, PNG output</td></tr>
+          <tr><td>CI</td><td>Builds and tests on Windows, Linux and macOS. Tagged releases publish all three binaries.</td></tr>
+          <tr><td>License</td><td>MIT</td></tr>
+        </table>
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="sr">
+    <div class="footer-block">
+      <strong>Spei.dev</strong>
+      <a href="/">← Back to index</a><br/>
+      © 2025–<span id="yr">2026</span>
+    </div>
+    <div class="footer-block footer-center">
+      <strong>Project</strong>
+      Glance3D v0.1.0<br/>MIT licensed
+    </div>
+    <div class="footer-block footer-right">
+      <strong>Source</strong>
+      <a href="https://github.com/speidev/Glance3D">GitHub ↗</a><br/>
+      <a href="https://github.com/speidev/Glance3D/issues">Report an issue ↗</a>
+    </div>
+  </footer>
+
+  <div class="v-rule-right"></div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+
+  window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => { $('wm').classList.add('go'); $('hdr').classList.add('go'); }, 100);
+    setTimeout(() => $('wmMeta').classList.add('go'), 500);
+    setTimeout(() => $('sb').classList.add('go'), 850);
+    setTimeout(() => $('hero').classList.add('go'), 700);
+  });
+
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      e.target.classList.add('go');
+      const h = e.target.querySelector('.hero-statement');
+      if (h) h.classList.add('go');
+      io.unobserve(e.target);
+    });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.sr').forEach(el => io.observe(el));
+
+  $('yr').textContent = new Date().getFullYear();
+
+  // ── ORBIT DEMO: the viewer's camera rig, in a canvas ──
+  // Same conventions as Glance3D: world Z-up, a yaw/pitch heading around a pivot, eye placed at
+  // pivot - forward * distance, pitch clamped short of vertical, default heading -120 / -20.
+  const cv = $('cv'), demo = $('demo'), ctx = cv.getContext('2d');
+  const DEG = Math.PI / 180, MAX_PITCH = 89 * DEG;
+  const DEFAULT = { yaw: -120 * DEG, pitch: -20 * DEG, dist: 6.2 };
+  let cam = { ...DEFAULT };
+  let interacted = false;
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // A little log cabin: box walls, hip roof, door. A nod to where the renderer came from.
+  const V = [
+    [-1.4,-1,0],[1.4,-1,0],[1.4,1,0],[-1.4,1,0],          // 0-3 floor
+    [-1.4,-1,1.2],[1.4,-1,1.2],[1.4,1,1.2],[-1.4,1,1.2],  // 4-7 wall tops
+    [-1.7,-1.3,1.2],[1.7,-1.3,1.2],[1.7,1.3,1.2],[-1.7,1.3,1.2], // 8-11 eaves
+    [-0.6,0,2.2],[0.6,0,2.2],                              // 12-13 ridge
+    [-0.3,1,0],[0.3,1,0],[0.3,1,0.8],[-0.3,1,0.8],         // 14-17 door (front, +Y)
+  ];
+  const E = [
+    [0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7],
+    [8,9],[9,10],[10,11],[11,8],[12,13],[8,12],[11,12],[9,13],[10,13],
+    [14,17],[17,16],[16,15],
+  ];
+  // Floor grid, like the viewer's: lines on the model's lowest plane.
+  const G = [];
+  for (let i = -4; i <= 4; i++) { G.push([[i*0.5,-2,0],[i*0.5,2,0]]); G.push([[-2,i*0.5,0],[2,i*0.5,0]]); }
+
+  function basis() {
+    const cp = Math.cos(cam.pitch);
+    const f = [cp*Math.cos(cam.yaw), cp*Math.sin(cam.yaw), Math.sin(cam.pitch)];
+    let r = [-f[1], f[0], 0];                       // cross(worldUp, f)
+    const rl = Math.hypot(r[0], r[1]); r = [r[0]/rl, r[1]/rl, 0];
+    const u = [f[1]*r[2]-f[2]*r[1], f[2]*r[0]-f[0]*r[2], f[0]*r[1]-f[1]*r[0]];
+    const pivot = [0, 0, 0.9];
+    const eye = [pivot[0]-f[0]*cam.dist, pivot[1]-f[1]*cam.dist, pivot[2]-f[2]*cam.dist];
+    return { f, r, u, eye };
+  }
+
+  function draw() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (cv.width !== Math.round(w*dpr) || cv.height !== Math.round(h*dpr)) { cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const { f, r, u, eye } = basis();
+    const halfTan = Math.tan(25 * DEG), scale = (h / 2) / halfTan;
+    // Camera space X=forward, Y=right, Z=up; divide by depth (x), exactly like the viewer's shader.
+    const proj = p => {
+      const d = [p[0]-eye[0], p[1]-eye[1], p[2]-eye[2]];
+      const x = d[0]*f[0]+d[1]*f[1]+d[2]*f[2];
+      const y = d[0]*r[0]+d[1]*r[1]+d[2]*r[2];
+      const z = d[0]*u[0]+d[1]*u[1]+d[2]*u[2];
+      return x > 0.05 ? [w/2 + y/x*scale, h/2 - z/x*scale] : null;
+    };
+    const line = (a, b) => { const p = proj(a), q = proj(b); if (!p || !q) return; ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); };
+
+    ctx.lineWidth = 1; ctx.strokeStyle = '#d6d4ce';
+    G.forEach(([a, b]) => line(a, b));
+    ctx.lineWidth = 1.25; ctx.strokeStyle = '#141414';
+    E.forEach(([a, b]) => line(V[a], V[b]));
+
+    $('readout').innerHTML = `yaw ${Math.round(cam.yaw/DEG)}°<br/>pitch ${Math.round(cam.pitch/DEG)}°`.replace(/-/g, '−');
+  }
+
+  let drag = null;
+  demo.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY }; interacted = true; demo.setPointerCapture(e.pointerId); });
+  demo.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    drag = { x: e.clientX, y: e.clientY };
+    cam.yaw += dx * 0.01;
+    cam.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, cam.pitch - dy * 0.01));
+    draw();
+  });
+  const end = () => { drag = null; };
+  demo.addEventListener('pointerup', end);
+  demo.addEventListener('pointercancel', end);
+  demo.addEventListener('wheel', e => {
+    e.preventDefault(); interacted = true;
+    cam.dist = Math.max(3, Math.min(14, cam.dist * Math.pow(0.85, -Math.sign(e.deltaY))));
+    draw();
+  }, { passive: false });
+  demo.addEventListener('dblclick', () => { cam = { ...DEFAULT }; interacted = false; draw(); });
+  window.addEventListener('resize', draw);
+
+  // Idle turntable until the visitor grabs it.
+  let last = performance.now();
+  function loop(t) {
+    const dt = Math.min(0.05, (t - last) / 1000); last = t;
+    if (!interacted && !drag && !reduceMotion) { cam.yaw += dt * 0.25; draw(); }
+    requestAnimationFrame(loop);
+  }
+  draw();
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>
