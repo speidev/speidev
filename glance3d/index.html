@@ -173,6 +173,19 @@
       font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mid);
       pointer-events: none; text-align: right; line-height: 1.8;
     }
+    .demo .launch {
+      position: absolute; left: 12px; top: 10px;
+      font-family: inherit; font-size: 9px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+      background: var(--ink); color: var(--off-white); border: 1px solid var(--ink);
+      padding: 9px 12px; cursor: pointer;
+      transition: background 0.35s ease, color 0.35s ease;
+    }
+    .demo .launch:hover { background: transparent; color: var(--ink); }
+    .demo .launch span { font-weight: 300; letter-spacing: 0.08em; margin-left: 6px; opacity: 0.7; }
+    .demo iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+    .demo.live { cursor: default; background: #1f2126; border-color: #1f2126; }
+    .demo.live canvas, .demo.live .readout, .demo.live .hint, .demo.live .launch { display: none; }
+    .demo-note { margin-top: -28px; margin-bottom: 40px; }
 
     kbd {
       font-family: inherit; font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
@@ -314,7 +327,7 @@
       <div class="sr">
         <p class="body-copy">
           Glance3D is a tiny standalone viewer for glTF and GLB files. There's no editor, no scene panel and no installer: drop a model on the window and look at it.
-          <strong>It's about 1,500 lines of C# on a hand-written OpenGL renderer</strong>, small enough to read in an afternoon.
+          <strong>It's about 1,800 lines of C# on a hand-written OpenGL renderer</strong>, small enough to read in an afternoon. It runs on the desktop and, compiled to WebAssembly, right here on this page.
         </p>
       </div>
 
@@ -323,7 +336,11 @@
           <canvas id="cv"></canvas>
           <span class="readout" id="readout">yaw −120°<br/>pitch −20°</span>
           <span class="hint">Drag to orbit · scroll to zoom · double-click to reset</span>
+          <button class="launch" id="launch" type="button">Run the real viewer<span>~2.4 MB</span></button>
         </div>
+        <p class="fine demo-note">
+          The wireframe is a sketch. The button loads Glance3D itself: the same C# loader, camera and shaders as the desktop app, compiled to WebAssembly and drawn with WebGL2. Drop your own <code>.glb</code> on it, or <a href="https://speidev.github.io/Glance3D/">open it full screen ↗</a>. Files never leave your browser.
+        </p>
       </div>
 
       <div class="sr">
@@ -332,6 +349,7 @@
           <a class="btn primary" href="https://github.com/speidev/Glance3D/releases/download/v0.1.0/glance3d-v0.1.0-win-x64.zip">Windows .zip</a>
           <a class="btn" href="https://github.com/speidev/Glance3D/releases/download/v0.1.0/glance3d-v0.1.0-linux-x64.tar.gz">Linux .tar.gz</a>
           <a class="btn" href="https://github.com/speidev/Glance3D/releases/download/v0.1.0/glance3d-v0.1.0-osx-arm64.tar.gz">macOS .tar.gz</a>
+          <a class="btn" href="https://speidev.github.io/Glance3D/">Run in browser ↗</a>
           <a class="btn" href="https://github.com/speidev/Glance3D">Source ↗</a>
         </div>
         <p class="fine">
@@ -349,6 +367,8 @@
           <span class="tag">GLSL</span>
           <span class="tag">glTF 2.0</span>
           <span class="tag">OpenTK</span>
+          <span class="tag">WebAssembly</span>
+          <span class="tag">WebGL2</span>
           <span class="tag">MIT</span>
         </div>
       </div>
@@ -372,7 +392,7 @@
       <div class="sr">
         <p class="section-label">// Reads</p>
         <table class="data-table">
-          <tr><td><b>Formats</b>glTF 2.0</td><td>Binary <code>.glb</code> and JSON <code>.gltf</code> with external or embedded buffers.</td></tr>
+          <tr><td><b>Formats</b>glTF 2.0</td><td>Binary <code>.glb</code> and JSON <code>.gltf</code> with external or embedded buffers. In the browser: <code>.glb</code>.</td></tr>
           <tr><td><b>Scene</b>Node hierarchy</td><td>Node transforms are baked in at load, mirrored instances keep their winding, and triangle strips and fans are expanded.</td></tr>
           <tr><td><b>Materials</b>Base color</td><td>Texture × factor × vertex color. Alpha mask and blend, double-sided, and <code>KHR_materials_unlit</code>.</td></tr>
           <tr><td><b>Pixel art</b>NEAREST samplers</td><td>A model that asks for nearest filtering gets it, so palette-textured low-poly art stays crisp.</td></tr>
@@ -394,8 +414,10 @@
         <table class="data-table">
           <tr><td>Requires</td><td>.NET 8 SDK and a GPU with OpenGL 3.3</td></tr>
           <tr><td>Run</td><td><code>dotnet run --project src/Glance3D -- model.glb</code></td></tr>
-          <tr><td>Tests</td><td>xUnit, headless: camera math, projection and culling, loader orientation and winding, CLI, PNG output</td></tr>
-          <tr><td>CI</td><td>Builds and tests on Windows, Linux and macOS. Tagged releases publish all three binaries.</td></tr>
+          <tr><td>Web</td><td><code>dotnet publish src/Glance3D.Web</code> gives a static site. No extra workloads are needed.</td></tr>
+          <tr><td>Layout</td><td><code>Glance3D.Core</code> holds all viewer logic. The desktop (OpenTK) and browser (WebAssembly) hosts are thin shells.</td></tr>
+          <tr><td>Tests</td><td>xUnit, headless: camera math, projection and culling, picking, input mapping, loader orientation and winding, CLI, PNG output</td></tr>
+          <tr><td>CI</td><td>Builds and tests on Windows, Linux and macOS. Tagged releases publish all three binaries, and every push to main redeploys the browser build.</td></tr>
           <tr><td>License</td><td>MIT</td></tr>
         </table>
       </div>
@@ -530,12 +552,31 @@
     draw();
   }, { passive: false });
   demo.addEventListener('dblclick', () => { cam = { ...DEFAULT }; interacted = false; draw(); });
+
+  // ── THE REAL VIEWER: swap the sketch for Glance3D itself, only when asked ──
+  // Nothing of the ~2.4 MB WebAssembly build loads until the click. The iframe keeps the
+  // viewer's full-window layout and styles isolated from this page.
+  let live = false;
+  const launch = $('launch');
+  launch.addEventListener('pointerdown', e => e.stopPropagation()); // don't start a sketch drag (and steal the click)
+  launch.addEventListener('click', () => {
+    live = true;
+    const f = document.createElement('iframe');
+    f.src = 'https://speidev.github.io/Glance3D/';
+    f.title = 'Glance3D viewer';
+    f.allow = 'fullscreen';
+    demo.classList.add('live');
+    demo.removeAttribute('role');
+    demo.setAttribute('aria-label', 'Glance3D viewer');
+    demo.appendChild(f);
+  });
   window.addEventListener('resize', draw);
 
   // Idle turntable until the visitor grabs it.
   let last = performance.now();
   function loop(t) {
     const dt = Math.min(0.05, (t - last) / 1000); last = t;
+    if (live) return; // the sketch is gone; stop its loop
     if (!interacted && !drag && !reduceMotion) { cam.yaw += dt * 0.25; draw(); }
     requestAnimationFrame(loop);
   }
